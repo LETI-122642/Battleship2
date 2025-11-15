@@ -5,6 +5,7 @@ package iscteiul.ista.battleship;
 
 /**
  * @author fba
+ *
  */
 public enum Compass {
     NORTH('n'), SOUTH('s'), EAST('e'), WEST('o'), UNKNOWN('u');
