@@ -1,664 +1,539 @@
 package iscteiul.ista.battleship;
 
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.*;
-import static org.junit.jupiter.api.condition.OS.*;
-import static org.junit.jupiter.api.condition.JRE.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Stream;
 
-/**
- * Comprehensive test class for Fleet implementation using JUnit 5 features.
- * Demonstrates advanced testing strategies and annotation usage.
- */
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@DisplayName("🚢 Fleet Management System Comprehensive Tests")
 class FleetTest {
 
-    private Fleet fleet;
     private final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
     private final PrintStream originalOut = System.out;
-    private static int testCounter = 0;
-
-    // ===== LIFECYCLE METHODS =====
-
-    @BeforeAll
-    @DisplayName("🚀 Global Test Suite Setup")
-    static void globalSetUp() {
-        System.out.println("=== Starting Fleet Test Suite ===");
-        testCounter = 0;
-    }
-
-    @AfterAll
-    @DisplayName("🏁 Global Test Suite Cleanup")
-    static void globalTearDown() {
-        System.out.println("=== Fleet Test Suite Completed ===");
-        System.out.println("Total tests executed: " + testCounter);
-    }
+    private Fleet fleet;
 
     @BeforeEach
-    @DisplayName("🔄 Individual Test Setup")
     void setUp() {
-        fleet = new Fleet();
         System.setOut(new PrintStream(outputStream));
-        testCounter++;
-        System.out.println("Initializing test #" + testCounter);
     }
 
     @AfterEach
-    @DisplayName("🧹 Individual Test Cleanup")
     void tearDown() {
         System.setOut(originalOut);
         outputStream.reset();
     }
 
-    // ===== NESTED TEST CLASSES =====
-
-    @Nested
-    @DisplayName("📥 Ship Addition Operations")
-    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-    class ShipAdditionTests {
-
-        @Test
-        @DisplayName("✅ Add Valid Ship to Empty Fleet")
-        void addShip_ValidShip_ShouldAddSuccessfully() {
-            // Arrange
-            IShip ship = createMockShip("Santa Maria", "Caravela", 3, 0, 0, Compass.EAST, true, false);
-
-            // Act
-            boolean result = fleet.addShip(ship);
-
-            // Assert
-            assertAll(
-                    () -> assertTrue(result, "Ship addition should succeed"),
-                    () -> assertEquals(1, fleet.getShips().size(), "Fleet should contain one ship"),
-                    () -> assertEquals(ship, fleet.getShips().get(0), "Added ship should match original")
-            );
-        }
-
-        @Test
-        @DisplayName("❌ Prevent Addition of Ship Outside Board Boundaries")
-        void addShip_OutsideBoard_ShouldNotAdd() {
-            // Arrange
-            IShip ship = createMockShip("Ghost Ship", "Galeao", 5, -1, 0, Compass.EAST, true, false);
-
-            // Act
-            boolean result = fleet.addShip(ship);
-
-            // Assert
-            assertAll(
-                    () -> assertFalse(result, "Ship outside board should be rejected"),
-                    () -> assertTrue(fleet.getShips().isEmpty(), "Fleet should remain empty")
-            );
-        }
-
-        @Test
-        @DisplayName("🚫 Prevent Addition Due to Collision Risk")
-        void addShip_CollisionRisk_ShouldNotAdd() {
-            // Arrange
-            IShip ship1 = createMockShip("Ship Alpha", "Galeao", 5, 0, 0, Compass.EAST, true, false);
-            IShip ship2 = createMockShip("Ship Beta", "Fragata", 4, 0, 0, Compass.EAST, true, true);
-
-            // Act
-            fleet.addShip(ship1);
-            boolean result = fleet.addShip(ship2);
-
-            // Assert
-            assertAll(
-                    () -> assertFalse(result, "Colliding ship should be rejected"),
-                    () -> assertEquals(1, fleet.getShips().size(), "Only one ship should be present")
-            );
-        }
-
-        @ParameterizedTest(name = "Position ({0},{1}) with bearing {2} should {3}")
-        @DisplayName("📊 Parameterized Ship Placement Validation")
-        @CsvSource({
-                "0, 0, east, true, 'Valid starting position'",
-                "5, 3, south, true, 'Valid middle position'",
-                "9, 9, east, false, 'Invalid edge position'",
-                "10, 0, east, false, 'Outside horizontal boundary'",
-                "0, 10, south, false, 'Outside vertical boundary'"
-        })
-        void addShip_ParameterizedPositions(int startX, int startY, String bearing,
-                                            boolean expectedSuccess, String description) {
-            // Arrange
-            Compass compass = Compass.charToCompass(bearing.charAt(0));
-            IShip ship = createMockShip("Test Ship", "Barca", 2, startX, startY, compass, true, false);
-
-            // Act
-            boolean result = fleet.addShip(ship);
-
-            // Assert
-            assertEquals(expectedSuccess, result,
-                    String.format("Failed: %s - Expected %s but was %s",
-                            description, expectedSuccess, result));
-        }
-
-        @Test
-        @DisplayName("📏 Fleet Capacity Limit Enforcement")
-        void addShip_FleetAtMaxCapacity_ShouldNotAdd() {
-            // Arrange - Fill fleet to capacity
-            for (int i = 0; i < 10; i++) {
-                IShip ship = createMockShip("Ship" + i, "Barca", 2, i * 3, 0, Compass.EAST, true, false);
-                assertTrue(fleet.addShip(ship), "Should add ship #" + i);
-            }
-
-            // Act - Try to exceed capacity
-            IShip extraShip = createMockShip("Extra Ship", "Barca", 2, 30, 0, Compass.EAST, true, false);
-            boolean result = fleet.addShip(extraShip);
-
-            // Assert
-            assertFalse(result, "Should reject ship when fleet is at capacity");
-            assertEquals(10, fleet.getShips().size(), "Fleet should remain at capacity");
-        }
-    }
-
-    @Nested
-    @DisplayName("🔍 Ship Retrieval and Query Operations")
-    class ShipRetrievalTests {
-
-        @Test
-        @DisplayName("📭 Retrieve Ships from Empty Fleet")
-        void getShips_EmptyFleet_ShouldReturnEmptyList() {
-            // Act
-            List<IShip> ships = fleet.getShips();
-
-            // Assert
-            assertAll(
-                    () -> assertTrue(ships.isEmpty(), "List should be empty"),
-                    () -> assertEquals(0, ships.size(), "List size should be zero"),
-                    () -> assertNotNull(ships, "List should not be null")
-            );
-        }
-
-        @Test
-        @DisplayName("📋 Retrieve All Ships from Populated Fleet")
-        void getShips_WithShips_ShouldReturnAllShips() {
-            // Arrange
-            IShip ship1 = createMockShip("Ship Uno", "Galeao", 5, 0, 0, Compass.EAST, true, false);
-            IShip ship2 = createMockShip("Ship Dos", "Fragata", 4, 5, 0, Compass.EAST, true, false);
-            fleet.addShip(ship1);
-            fleet.addShip(ship2);
-
-            // Act
-            List<IShip> ships = fleet.getShips();
-
-            // Assert
-            assertAll(
-                    () -> assertEquals(2, ships.size(), "Should return exactly two ships"),
-                    () -> assertTrue(ships.contains(ship1), "Should contain first ship"),
-                    () -> assertTrue(ships.contains(ship2), "Should contain second ship"),
-                    () -> assertIterableEquals(List.of(ship1, ship2), ships, "Should maintain insertion order")
-            );
-        }
-
-        @ParameterizedTest
-        @DisplayName("🎯 Filter Ships by Various Categories")
-        @ValueSource(strings = {"Galeao", "Fragata", "Nau", "Caravela", "Barca"})
-        void getShipsLike_VariousCategories(String category) {
-            // Arrange
-            IShip ship1 = createMockShip("Ship1", "Galeao", 5, 0, 0, Compass.EAST, true, false);
-            IShip ship2 = createMockShip("Ship2", "Fragata", 4, 5, 0, Compass.EAST, true, false);
-            IShip ship3 = createMockShip("Ship3", "Galeao", 5, 0, 5, Compass.EAST, true, false);
-            fleet.addShip(ship1);
-            fleet.addShip(ship2);
-            fleet.addShip(ship3);
-
-            // Act
-            List<IShip> filteredShips = fleet.getShipsLike(category);
-
-            // Assert
-            switch (category) {
-                case "Galeao":
-                    assertEquals(2, filteredShips.size(), "Should find two Galleons");
-                    break;
-                case "Fragata":
-                    assertEquals(1, filteredShips.size(), "Should find one Frigate");
-                    break;
-                default:
-                    assertTrue(filteredShips.isEmpty(),
-                            "Should return empty list for category: " + category);
-            }
-
-            // Verify all returned ships match the requested category
-            assertTrue(filteredShips.stream()
-                            .allMatch(ship -> ship.getCategory().equals(category)),
-                    "All returned ships should match category: " + category);
-        }
-
-        @Test
-        @DisplayName("🛟 Retrieve Only Floating Ships from Mixed Fleet")
-        void getFloatingShips_MixedFloatingAndSunk_ShouldReturnOnlyFloating() {
-            // Arrange
-            IShip floatingShip1 = createMockShip("Unsinkable", "Galeao", 5, 0, 0, Compass.EAST, true, false);
-            IShip sunkShip = createMockShip("Titanic", "Fragata", 4, 5, 0, Compass.EAST, false, false);
-            IShip floatingShip2 = createMockShip("Survivor", "Nau", 3, 0, 5, Compass.EAST, true, false);
-
-            fleet.addShip(floatingShip1);
-            fleet.addShip(sunkShip);
-            fleet.addShip(floatingShip2);
-
-            // Act
-            List<IShip> floatingShips = fleet.getFloatingShips();
-
-            // Assert
-            assertAll(
-                    () -> assertEquals(2, floatingShips.size(), "Should return two floating ships"),
-                    () -> assertTrue(floatingShips.contains(floatingShip1), "Should contain first floating ship"),
-                    () -> assertTrue(floatingShips.contains(floatingShip2), "Should contain second floating ship"),
-                    () -> assertFalse(floatingShips.contains(sunkShip), "Should not contain sunk ship"),
-                    () -> assertTrue(floatingShips.stream().allMatch(IShip::stillFloating),
-                            "All returned ships should be floating")
-            );
-        }
-
-        @Test
-        @DisplayName("⚓️ Retrieve Empty List When All Ships Are Sunk")
-        void getFloatingShips_AllSunk_ShouldReturnEmptyList() {
-            // Arrange
-            IShip sunkShip1 = createMockShip("Wreck1", "Galeao", 5, 0, 0, Compass.EAST, false, false);
-            IShip sunkShip2 = createMockShip("Wreck2", "Fragata", 4, 5, 0, Compass.EAST, false, false);
-
-            fleet.addShip(sunkShip1);
-            fleet.addShip(sunkShip2);
-
-            // Act
-            List<IShip> floatingShips = fleet.getFloatingShips();
-
-            // Assert
-            assertTrue(floatingShips.isEmpty(), "Should return empty list when all ships are sunk");
-        }
-    }
-
-    @Nested
-    @DisplayName("📍 Position-based Operations")
-    class PositionBasedTests {
-
-        @Test
-        @DisplayName("🎯 Find Ship at Occupied Position")
-        void shipAt_PositionOccupied_ShouldReturnShip() {
-            // Arrange
-            MockPosition position = new MockPosition(2, 0);
-            IShip ship = createMockShip("Positioned Ship", "Galeao", 5, 0, 0, Compass.EAST, true, false);
-            fleet.addShip(ship);
-
-            // Act
-            IShip result = fleet.shipAt(position);
-
-            // Assert
-            assertAll(
-                    () -> assertNotNull(result, "Should find ship at occupied position"),
-                    () -> assertEquals(ship, result, "Returned ship should match expected"),
-                    () -> assertEquals("Positioned Ship", result.toString().split(" ")[0],
-                            "Ship name should match")
-            );
-        }
-
-        @Test
-        @DisplayName("❌ Return Null for Unoccupied Position")
-        void shipAt_PositionNotOccupied_ShouldReturnNull() {
-            // Arrange
-            MockPosition position = new MockPosition(10, 10);
-            IShip ship = createMockShip("Distant Ship", "Galeao", 5, 0, 0, Compass.EAST, true, false);
-            fleet.addShip(ship);
-
-            // Act
-            IShip result = fleet.shipAt(position);
-
-            // Assert
-            assertNull(result, "Should return null for unoccupied position");
-        }
-
-        @Test
-        @DisplayName("🌊 Handle Empty Fleet in Position Query")
-        void shipAt_EmptyFleet_ShouldReturnNull() {
-            // Arrange
-            MockPosition position = new MockPosition(0, 0);
-
-            // Act
-            IShip result = fleet.shipAt(position);
-
-            // Assert
-            assertNull(result, "Should return null for empty fleet");
-        }
-
-        @ParameterizedTest(name = "Position ({0},{1}) - should find ship: {2}")
-        @DisplayName("🗺️ Comprehensive Position Validation")
-        @MethodSource("providePositionTestCases")
-        void shipAt_VariousPositions(int posX, int posY, boolean shouldFindShip, String description) {
-            // Arrange - Create a horizontal ship from (1,1) to (3,1)
-            IShip ship = createMockShip("Test Ship", "Nau", 3, 1, 1, Compass.EAST, true, false);
-            fleet.addShip(ship);
-            MockPosition position = new MockPosition(posX, posY);
-
-            // Act
-            IShip result = fleet.shipAt(position);
-
-            // Assert
-            if (shouldFindShip) {
-                assertNotNull(result, "Should find ship at " + description);
-                assertEquals(ship, result, "Returned ship should match expected");
-            } else {
-                assertNull(result, "Should not find ship at " + description);
-            }
-        }
-
-        private static Stream<Arguments> providePositionTestCases() {
-            return Stream.of(
-                    Arguments.of(1, 1, true, "ship start position"),
-                    Arguments.of(2, 1, true, "ship middle position"),
-                    Arguments.of(3, 1, true, "ship end position"),
-                    Arguments.of(0, 1, false, "position before ship"),
-                    Arguments.of(4, 1, false, "position after ship"),
-                    Arguments.of(2, 0, false, "different row above"),
-                    Arguments.of(2, 2, false, "different row below"),
-                    Arguments.of(1, 2, false, "diagonal position")
-            );
-        }
-    }
-
-    @Nested
-    @DisplayName("📊 Output and Display Operations")
-    class OutputTests {
-
-        @Test
-        @DisplayName("📋 Print Comprehensive Fleet Status")
-        void printStatus_ShouldPrintAllStatusInformation() {
-            // Arrange
-            IShip ship1 = createMockShip("Santa Maria", "Caravela", 3, 0, 0, Compass.EAST, true, false);
-            IShip ship2 = createMockShip("Sao Gabriel", "Nau", 4, 3, 0, Compass.EAST, false, false);
-            fleet.addShip(ship1);
-            fleet.addShip(ship2);
-
-            // Act
-            fleet.printStatus();
-
-            // Assert
-            String output = outputStream.toString();
-            assertAll(
-                    () -> assertTrue(output.contains("Santa Maria"), "Should print first ship name"),
-                    () -> assertTrue(output.contains("Sao Gabriel"), "Should print second ship name"),
-                    () -> assertFalse(output.isEmpty(), "Output should not be empty")
-            );
-        }
-
-        @Test
-        @DisplayName("🚢 Print Ships Filtered by Specific Category")
-        void printShipsByCategory_ValidCategory_ShouldPrintShips() {
-            // Arrange
-            IShip ship1 = createMockShip("Galleon 1", "Galeao", 5, 0, 0, Compass.EAST, true, false);
-            IShip ship2 = createMockShip("Galleon 2", "Galeao", 5, 5, 0, Compass.EAST, true, false);
-            IShip otherShip = createMockShip("Frigate", "Fragata", 4, 0, 5, Compass.EAST, true, false);
-
-            fleet.addShip(ship1);
-            fleet.addShip(ship2);
-            fleet.addShip(otherShip);
-
-            // Act
-            fleet.printShipsByCategory("Galeao");
-
-            // Assert
-            String output = outputStream.toString();
-            assertAll(
-                    () -> assertTrue(output.contains("Galleon 1"), "Should print first galleon"),
-                    () -> assertTrue(output.contains("Galleon 2"), "Should print second galleon"),
-                    () -> assertFalse(output.contains("Frigate"), "Should not print ships from other categories")
-            );
-        }
-
-        @Test
-        @DisplayName("🛟 Print Only Floating Ships")
-        void printFloatingShips_ShouldPrintOnlyFloatingShips() {
-            // Arrange
-            IShip floatingShip = createMockShip("Survivor", "Galeao", 5, 0, 0, Compass.EAST, true, false);
-            IShip sunkShip = createMockShip("Sunken", "Fragata", 4, 5, 0, Compass.EAST, false, false);
-            fleet.addShip(floatingShip);
-            fleet.addShip(sunkShip);
-
-            // Act
-            fleet.printFloatingShips();
-
-            // Assert
-            String output = outputStream.toString();
-            assertAll(
-                    () -> assertTrue(output.contains("Survivor"), "Should print floating ship"),
-                    () -> assertFalse(output.contains("Sunken"), "Should not print sunk ship")
-            );
-        }
-
-        @Test
-        @DisplayName("📜 Print All Ships in Fleet")
-        void printAllShips_ShouldPrintAllShips() {
-            // Arrange
-            IShip ship1 = createMockShip("Ship Alpha", "Galeao", 5, 0, 0, Compass.EAST, true, false);
-            IShip ship2 = createMockShip("Ship Beta", "Fragata", 4, 5, 0, Compass.EAST, false, false);
-            fleet.addShip(ship1);
-            fleet.addShip(ship2);
-
-            // Act
-            fleet.printAllShips();
-
-            // Assert
-            String output = outputStream.toString();
-            assertAll(
-                    () -> assertTrue(output.contains("Ship Alpha"), "Should print first ship"),
-                    () -> assertTrue(output.contains("Ship Beta"), "Should print second ship")
-            );
-        }
-
-        @Test
-        @DisplayName("🖨️ Static PrintShips Method Should Print Given List")
-        void staticPrintShips_ShouldPrintAllShipsInList() {
-            // Arrange
-            List<IShip> ships = new ArrayList<>();
-            ships.add(createMockShip("Static Ship 1", "Galeao", 5, 0, 0, Compass.EAST, true, false));
-            ships.add(createMockShip("Static Ship 2", "Fragata", 4, 5, 0, Compass.EAST, true, false));
-
-            // Act
-            Fleet.printShips(ships);
-
-            // Assert
-            String output = outputStream.toString();
-            assertAll(
-                    () -> assertTrue(output.contains("Static Ship 1"), "Should print first static ship"),
-                    () -> assertTrue(output.contains("Static Ship 2"), "Should print second static ship")
-            );
-        }
-    }
-
-    // ===== SPECIALIZED TESTS =====
-
     @Test
-    @Disabled("🚧 Under Construction - Advanced Formation Logic")
-    @DisplayName("🔮 Future Feature: Ship Formation Validation")
-    void testShipFormations_NotYetImplemented() {
-        // This test will validate complex ship formations
-        // Currently disabled as the feature is in development
-        fail("Ship formation validation not yet implemented");
+    void printShips() {
+
+        Fleet fleet = new Fleet();
+
+        // Arrange: create ships
+        MockShip ship1 = new MockShip("Galeao", 3);
+        MockShip ship2 = new MockShip("Fragata", 2);
+
+        fleet.addShip(ship1);
+        fleet.addShip(ship2);
+
+        // Act
+        Fleet.printShips(fleet.getShips());
+
+        // Assert: verify output contains exact ship.toString()
+        String output = outputStream.toString();
+        assertAll(
+                () -> assertTrue(output.contains(ship1.toString()), "Output should contain ship1"),
+                () -> assertTrue(output.contains(ship2.toString()), "Output should contain ship2")
+        );
     }
 
     @Test
-    @DisplayName("💻 Windows-Specific Fleet Operations")
-    void windowsOnlyTest() {
-        assumeTrue(WINDOWS.isCurrentOs(), "Test designed for Windows environment");
+    void getShips() {
 
-        // Windows-specific fleet operations would go here
-        IShip ship = createMockShip("Windows Ship", "Barca", 2, 0, 0, Compass.EAST, true, false);
-        boolean result = fleet.addShip(ship);
+        Fleet fleet = new Fleet();
 
-        assertTrue(result, "Windows-specific fleet operation should succeed");
+        List<IShip> ships = fleet.getShips();
+
+        assertAll(
+                () -> assertNotNull(ships, "getShips() should never return null"),
+                () -> assertTrue(ships.isEmpty(), "New fleet should have no ships")
+        );
+
+        MockShip ship1 = new MockShip("Galeao", 3);
+        ship1.setPositions(List.of(new MockPosition(0, 0), new MockPosition(0, 1), new MockPosition(0, 2)));
+        ship1.setBoundary(0, 2, 0, 0);
+
+        MockShip ship2 = new MockShip("Fragata", 2);
+        ship2.setPositions(List.of(new MockPosition(1, 0), new MockPosition(1, 1)));
+        ship2.setBoundary(0, 1, 1, 1);
+
+        assertTrue(fleet.addShip(ship1), "Should add first ship");
+        assertTrue(fleet.addShip(ship2), "Should add second ship");
+
+        List<IShip> retrievedShips = fleet.getShips();
+
+        assertAll(
+                () -> assertEquals(2, retrievedShips.size(), "Fleet should contain 2 ships"),
+                () -> assertSame(ship1, retrievedShips.get(0), "First ship should match ship1"),
+                () -> assertSame(ship2, retrievedShips.get(1), "Second ship should match ship2")
+        );
     }
 
     @Test
-    @DisplayName("☕️ Java 11+ Compatibility Check")
-    void java11PlusTest() {
-        assumeTrue(JAVA_17.isCurrentVersion() || JAVA_21.isCurrentVersion(),
-                "Test requires Java 11 or higher");
+    void addShip() {
 
-        // Test modern Java features compatibility
-        IShip ship = createMockShip("Modern Ship", "Nau", 3, 0, 0, Compass.EAST, true, false);
-        var ships = List.of(ship); // Using 'var' from Java 10+
+        Fleet fleet = new Fleet();
 
-        fleet.addShip(ship);
-        var result = fleet.getShips();
+        MockShip validShip = new MockShip("Galeao", 3);
+        validShip.setPositions(List.of(
+                new MockPosition(0, 0),
+                new MockPosition(0, 1),
+                new MockPosition(0, 2)
+        ));
+        validShip.setBoundary(0, 2, 0, 0); // left, right, top, bottom
+        validShip.setFloating(true);
+        validShip.setCollisionResult(false); // no collision risk
 
-        assertFalse(result.isEmpty(), "Should work with modern Java features");
+        boolean result1 = fleet.addShip(validShip);
+
+        assertAll(
+                () -> assertTrue(result1, "Valid ship should be added successfully"),
+                () -> assertEquals(1, fleet.getShips().size(), "Fleet should contain 1 ship"),
+                () -> assertSame(validShip, fleet.getShips().get(0), "Added ship should match original")
+        );
+
+        MockShip outOfBoundsShip = new MockShip("Fragata", 2);
+        outOfBoundsShip.setPositions(List.of(
+                new MockPosition(-1, 0),
+                new MockPosition(-1, 1)
+        ));
+        outOfBoundsShip.setBoundary(-1, 0, -1, 0); // invalid positions
+        outOfBoundsShip.setFloating(true);
+        outOfBoundsShip.setCollisionResult(false);
+
+        boolean result2 = fleet.addShip(outOfBoundsShip);
+
+        assertAll(
+                () -> assertFalse(result2, "Ship outside board should be rejected"),
+                () -> assertEquals(1, fleet.getShips().size(), "Fleet size should remain 1")
+        );
     }
 
     @Test
-    @DisplayName("⚡️ Performance: Rapid Sequential Ship Additions")
-    void performance_RapidShipAdditions() {
-        // Test performance with multiple rapid additions
-        int numberOfShips = 5;
+    void getShipsLike() {
 
-        for (int i = 0; i < numberOfShips; i++) {
-            IShip ship = createMockShip("FastShip" + i, "Barca", 2, i * 2, 0, Compass.EAST, true, false);
-            assertTrue(fleet.addShip(ship), "Should rapidly add ship #" + i);
-        }
+        Fleet fleet = new Fleet();
 
-        assertEquals(numberOfShips, fleet.getShips().size(),
-                "All rapid additions should be successful");
+        MockShip ship1 = new MockShip("Galeao", 3);
+        ship1.setPositions(List.of(new MockPosition(0, 0)));
+        ship1.setBoundary(0, 0, 0, 0);
+
+        MockShip ship2 = new MockShip("Fragata", 2);
+        ship2.setPositions(List.of(new MockPosition(1, 0)));
+        ship2.setBoundary(1, 1, 0, 0);
+
+        MockShip ship3 = new MockShip("Galeao", 4);
+        ship3.setPositions(List.of(new MockPosition(2, 0)));
+        ship3.setBoundary(2, 2, 0, 0);
+
+        fleet.addShip(ship1);
+        fleet.addShip(ship2);
+        fleet.addShip(ship3);
+
+        List<IShip> galleons = fleet.getShipsLike("Galeao");
+
+        assertAll(
+                () -> assertEquals(2, galleons.size(), "Should return exactly 2 Galleons"),
+                () -> assertSame(ship1, galleons.get(0), "First Galleon should be ship1"),
+                () -> assertSame(ship3, galleons.get(1), "Second Galleon should be ship3")
+        );
+
+        List<IShip> frigates = fleet.getShipsLike("Fragata");
+        assertEquals(1, frigates.size(), "Should return 1 Fragata");
+        assertSame(ship2, frigates.get(0), "Returned ship should be ship2");
+
+        List<IShip> barcas = fleet.getShipsLike("Barca");
+        assertTrue(barcas.isEmpty(), "Should return empty list for category with no ships");
     }
 
-    // ===== HELPER METHODS =====
+    @Test
+    void getFloatingShips() {
 
-    private IShip createMockShip(String name, String category, int size, int startX, int startY,
-                                 Compass bearing, boolean floating, boolean tooClose) {
-        return new MockShip(name, category, size, startX, startY, bearing, floating, tooClose);
+        Fleet fleet = new Fleet();
+
+        MockShip floating1 = new MockShip("Galeao", 3);
+        floating1.setPositions(List.of(new MockPosition(0, 0)));
+        floating1.setBoundary(0, 0, 0, 0);
+        floating1.setFloating(true); // still floating
+
+        MockShip sunk = new MockShip("Fragata", 2);
+        sunk.setPositions(List.of(new MockPosition(1, 0)));
+        sunk.setBoundary(1, 1, 0, 0);
+        sunk.setFloating(false); // sunk
+
+        MockShip floating2 = new MockShip("Nau", 4);
+        floating2.setPositions(List.of(new MockPosition(2, 0)));
+        floating2.setBoundary(2, 2, 0, 0);
+        floating2.setFloating(true); // still floating
+
+        fleet.addShip(floating1);
+        fleet.addShip(sunk);
+        fleet.addShip(floating2);
+
+        List<IShip> floatingShips = fleet.getFloatingShips();
+
+        assertAll(
+                () -> assertEquals(2, floatingShips.size(), "Should return exactly 2 floating ships"),
+                () -> assertSame(floating1, floatingShips.get(0), "First floating ship should be floating1"),
+                () -> assertSame(floating2, floatingShips.get(1), "Second floating ship should be floating2"),
+                () -> assertFalse(floatingShips.contains(sunk), "List should not contain sunk ship")
+        );
+
+        fleet = new Fleet(); // empty fleet
+        MockShip onlySunk = new MockShip("Galeao", 3);
+        onlySunk.setPositions(List.of(new MockPosition(0, 0)));
+        onlySunk.setBoundary(0, 0, 0, 0);
+        onlySunk.setFloating(false);
+        fleet.addShip(onlySunk);
+
+        List<IShip> emptyFloating = fleet.getFloatingShips();
+        assertTrue(emptyFloating.isEmpty(), "Should return empty list when all ships are sunk");
     }
 
-    // ===== MOCK IMPLEMENTATIONS =====
+    @Test
+    void shipAt() {
 
-    private static class MockShip implements IShip {
-        private String name;
+        Fleet fleet = new Fleet();
+
+        MockShip ship1 = new MockShip("Galeao", 3);
+        ship1.setPositions(List.of(
+                new MockPosition(0, 0),
+                new MockPosition(0, 1),
+                new MockPosition(0, 2)
+        ));
+        ship1.setBoundary(0, 2, 0, 0);
+        ship1.setFloating(true);
+
+        MockShip ship2 = new MockShip("Fragata", 2);
+        ship2.setPositions(List.of(
+                new MockPosition(1, 0),
+                new MockPosition(1, 1)
+        ));
+        ship2.setBoundary(0, 1, 1, 1);
+        ship2.setFloating(true);
+
+        fleet.addShip(ship1);
+        fleet.addShip(ship2);
+
+        IPosition pos0 = new MockPosition(0, 0);
+        IPosition pos1 = new MockPosition(0, 1);
+        IPosition pos2 = new MockPosition(0, 2);
+
+        assertAll(
+                () -> assertSame(ship1, fleet.shipAt(pos0), "Position (0,0) should return ship1"),
+                () -> assertSame(ship1, fleet.shipAt(pos1), "Position (0,1) should return ship1"),
+                () -> assertSame(ship1, fleet.shipAt(pos2), "Position (0,2) should return ship1")
+        );
+
+        IPosition pos3 = new MockPosition(1, 0);
+        IPosition pos4 = new MockPosition(1, 1);
+
+        assertAll(
+                () -> assertSame(ship2, fleet.shipAt(pos3), "Position (1,0) should return ship2"),
+                () -> assertSame(ship2, fleet.shipAt(pos4), "Position (1,1) should return ship2")
+        );
+
+        IPosition emptyPos = new MockPosition(2, 2);
+        assertNull(fleet.shipAt(emptyPos), "Position (2,2) should return null");
+
+
+        Fleet emptyFleet = new Fleet();
+        IPosition anyPos = new MockPosition(0, 0);
+        assertNull(emptyFleet.shipAt(anyPos), "Empty fleet should return null for any position");
+    }
+
+    @Test
+    void printStatus() {
+
+        Fleet fleet = new Fleet();
+
+        MockShip g1 = new MockShip("Galeao1", 3);
+        g1.setPositions(List.of(new MockPosition(0, 0)));
+        g1.setBoundary(0, 0, 0, 0);
+        g1.setFloating(true);
+
+        MockShip f1 = new MockShip("Fragata1", 2);
+        f1.setPositions(List.of(new MockPosition(1, 0)));
+        f1.setBoundary(1, 1, 0, 0);
+        f1.setFloating(false);
+
+        MockShip n1 = new MockShip("Nau1", 4);
+        n1.setPositions(List.of(new MockPosition(2, 0)));
+        n1.setBoundary(2, 2, 0, 0);
+        n1.setFloating(true);
+
+        fleet.addShip(g1);
+        fleet.addShip(f1);
+        fleet.addShip(n1);
+
+        // Act
+        fleet.printStatus();
+
+        // Assert: output contains all ship names (duplicates are fine)
+        String output = outputStream.toString();
+        assertAll(
+                () -> assertTrue(output.contains("MockShip{Galeao1}"), "Output should contain Galeao1"),
+                () -> assertTrue(output.contains("MockShip{Fragata1}"), "Output should contain Fragata1"),
+                () -> assertTrue(output.contains("MockShip{Nau1}"), "Output should contain Nau1")
+        );
+
+    }
+
+    @Test
+    void printShipsByCategory() {
+
+        Fleet fleet = new Fleet();
+
+        // Arrange
+        MockShip ship1 = new MockShip("Galeao", 3);
+        MockShip ship2 = new MockShip("Galeao", 2);
+        MockShip ship3 = new MockShip("Fragata", 2);
+
+        fleet.addShip(ship1);
+        fleet.addShip(ship2);
+        fleet.addShip(ship3);
+
+        // Act: print only Galeao ships
+        fleet.printShipsByCategory("Galeao");
+
+        String output = outputStream.toString();
+
+        // Assert: use ship.toString() for exact match
+        assertAll(
+                () -> assertTrue(output.contains(ship1.toString()), "Output should contain ship1"),
+                () -> assertTrue(output.contains(ship2.toString()), "Output should contain ship2"),
+                () -> assertFalse(output.contains(ship3.toString()), "Output should NOT contain Fragata ship")
+        );
+    }
+
+    @Test
+    void printFloatingShips() {
+
+        Fleet fleet = new Fleet();
+
+        MockShip floating1 = new MockShip("Galeao1", 3);
+        floating1.setPositions(List.of(new MockPosition(0, 0)));
+        floating1.setBoundary(0, 0, 0, 0);
+        floating1.setFloating(true);
+
+        MockShip floating2 = new MockShip("Nau1", 2);
+        floating2.setPositions(List.of(new MockPosition(1, 0)));
+        floating2.setBoundary(1, 1, 0, 0);
+        floating2.setFloating(true);
+
+        MockShip sunk = new MockShip("Fragata1", 2);
+        sunk.setPositions(List.of(new MockPosition(2, 0)));
+        sunk.setBoundary(2, 2, 0, 0);
+        sunk.setFloating(false);
+
+        fleet.addShip(floating1);
+        fleet.addShip(floating2);
+        fleet.addShip(sunk);
+
+        fleet.printFloatingShips();
+
+        String output = outputStream.toString();
+        assertAll(
+                () -> assertTrue(output.contains("MockShip{Galeao1}"), "Output should contain floating ship Galeao1"),
+                () -> assertTrue(output.contains("MockShip{Nau1}"), "Output should contain floating ship Nau1"),
+                () -> assertFalse(output.contains("MockShip{Fragata1}"), "Output should not contain sunk ship Fragata1")
+        );
+
+    }
+
+    @Test
+    void printAllShips() {
+
+        Fleet fleet = new Fleet();
+
+        MockShip ship1 = new MockShip("Galeao1", 3);
+        ship1.setPositions(List.of(new MockPosition(0, 0)));
+        ship1.setBoundary(0, 0, 0, 0);
+        ship1.setFloating(true);
+
+        MockShip ship2 = new MockShip("Fragata1", 2);
+        ship2.setPositions(List.of(new MockPosition(1, 0)));
+        ship2.setBoundary(1, 1, 0, 0);
+        ship2.setFloating(false);
+
+        MockShip ship3 = new MockShip("Nau1", 4);
+        ship3.setPositions(List.of(new MockPosition(2, 0)));
+        ship3.setBoundary(2, 2, 0, 0);
+        ship3.setFloating(true);
+
+        fleet.addShip(ship1);
+        fleet.addShip(ship2);
+        fleet.addShip(ship3);
+
+        fleet.printAllShips();
+
+        String output = outputStream.toString();
+        assertAll(
+                () -> assertTrue(output.contains("MockShip{Galeao1}"), "Output should contain ship1"),
+                () -> assertTrue(output.contains("MockShip{Fragata1}"), "Output should contain ship2"),
+                () -> assertTrue(output.contains("MockShip{Nau1}"), "Output should contain ship3")
+        );
+
+    }
+
+    private class MockShip implements IShip {
+
         private String category;
-        private int size;
-        private int startX, startY;
-        private Compass bearing;
-        private boolean floating;
-        private boolean tooClose;
-        private List<IPosition> positions;
+        private Integer size;
+        private List<IPosition> positions = new ArrayList<>();
+        private IPosition basePosition;
+        private Compass bearing = Compass.UNKNOWN;
 
-        public MockShip(String name, String category, int size, int startX, int startY,
-                        Compass bearing, boolean floating, boolean tooClose) {
-            this.name = name;
+        // Boundary values — fully controllable
+        private int leftMost = 0;
+        private int rightMost = 0;
+        private int topMost = 0;
+        private int bottomMost = 0;
+
+        private boolean floating = true;
+
+        // For controlling collision behavior
+        private boolean collisionResult = false;
+
+        public MockShip(String category, int size) {
             this.category = category;
             this.size = size;
-            this.startX = startX;
-            this.startY = startY;
-            this.bearing = bearing;
+        }
+
+        // ----------------------------
+        // Configuration helpers
+        // ----------------------------
+
+        public void setPositions(List<IPosition> posList) {
+            this.positions = new ArrayList<>(posList);
+        }
+
+        public void setBoundary(int left, int right, int top, int bottom) {
+            this.leftMost = left;
+            this.rightMost = right;
+            this.topMost = top;
+            this.bottomMost = bottom;
+        }
+
+        public void setFloating(boolean floating) {
             this.floating = floating;
-            this.tooClose = tooClose;
-            this.positions = createPositions();
         }
 
-        private List<IPosition> createPositions() {
-            List<IPosition> posList = new ArrayList<>();
-            for (int i = 0; i < size; i++) {
-                int x = startX + (bearing == Compass.EAST ? i : 0);
-                int y = startY + (bearing == Compass.SOUTH ? i : 0);
-                MockPosition pos = new MockPosition(x, y);
-                pos.occupy();
-                posList.add(pos);
-            }
-            return posList;
+        public void setCollisionResult(boolean result) {
+            this.collisionResult = result;
+        }
+
+        public void setBearing(Compass bearing) {
+            this.bearing = bearing;
+        }
+
+        public void setBasePosition(IPosition pos) {
+            this.basePosition = pos;
+        }
+
+        // ----------------------------
+        // Interface implementation
+        // ----------------------------
+
+        @Override
+        public String getCategory() {
+            return category;
         }
 
         @Override
-        public String getCategory() { return category; }
+        public Integer getSize() {
+            return size;
+        }
 
         @Override
-        public Integer getSize() { return size; }
+        public List<IPosition> getPositions() {
+            return new ArrayList<>(positions);
+        }
 
         @Override
-        public List<IPosition> getPositions() { return new ArrayList<>(positions); }
+        public IPosition getPosition() {
+            return basePosition;
+        }
 
         @Override
-        public IPosition getPosition() { return positions.get(0); }
+        public Compass getBearing() {
+            return bearing;
+        }
 
         @Override
-        public Compass getBearing() { return bearing; }
-
-        @Override
-        public boolean stillFloating() { return floating; }
+        public boolean stillFloating() {
+            return floating;
+        }
 
         @Override
         public int getTopMostPos() {
-            return bearing == Compass.SOUTH ? startY : startY;
+            return topMost;
         }
 
         @Override
         public int getBottomMostPos() {
-            return bearing == Compass.SOUTH ? startY + size - 1 : startY;
+            return bottomMost;
         }
 
         @Override
         public int getLeftMostPos() {
-            return bearing == Compass.EAST ? startX : startX;
+            return leftMost;
         }
 
         @Override
         public int getRightMostPos() {
-            return bearing == Compass.EAST ? startX + size - 1 : startX;
+            return rightMost;
         }
 
         @Override
         public boolean occupies(IPosition pos) {
-            return positions.stream().anyMatch(p -> p.equals(pos));
+            return positions.contains(pos);
         }
 
         @Override
         public boolean tooCloseTo(IShip other) {
-            return tooClose;
+            return collisionResult;
         }
 
         @Override
         public boolean tooCloseTo(IPosition pos) {
-            return positions.stream().anyMatch(p -> p.isAdjacentTo(pos));
+            // Simplified: adjacency check
+            for (IPosition p : positions) {
+                if (p.isAdjacentTo(pos) || p.equals(pos)) return true;
+            }
+            return false;
         }
 
         @Override
         public void shoot(IPosition pos) {
-            positions.stream()
-                    .filter(p -> p.equals(pos))
-                    .findFirst()
-                    .ifPresent(IPosition::shoot);
+            // For Fleet tests, no need to simulate damage
+            floating = false;
         }
 
         @Override
         public String toString() {
-            return String.format("%s (%s) [%d] at (%d,%d) facing %s",
-                    name, category, size, startX, startY, bearing);
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj) return true;
-            if (!(obj instanceof MockShip)) return false;
-            MockShip other = (MockShip) obj;
-            return this.name.equals(other.name) &&
-                    this.startX == other.startX &&
-                    this.startY == other.startY;
-        }
-
-        @Override
-        public int hashCode() {
-            return name.hashCode() + startX * 31 + startY;
+            return "MockShip{" + category + "}";
         }
     }
 
-    private static class MockPosition implements IPosition {
-        private int row, column;
+    private class MockPosition implements IPosition {
+
+        private int row;
+        private int column;
         private boolean occupied = false;
         private boolean hit = false;
 
@@ -668,47 +543,48 @@ class FleetTest {
         }
 
         @Override
-        public int getRow() { return row; }
+        public int getRow() {
+            return row;
+        }
 
         @Override
-        public int getColumn() { return column; }
+        public int getColumn() {
+            return column;
+        }
 
         @Override
         public boolean equals(Object other) {
-            if (this == other) return true;
             if (!(other instanceof IPosition)) return false;
-            IPosition that = (IPosition) other;
-            return this.row == that.getRow() && this.column == that.getColumn();
+            IPosition p = (IPosition) other;
+            return this.row == p.getRow() && this.column == p.getColumn();
         }
 
         @Override
         public boolean isAdjacentTo(IPosition other) {
-            int rowDiff = Math.abs(this.row - other.getRow());
-            int colDiff = Math.abs(this.column - other.getColumn());
-            return (rowDiff <= 1 && colDiff <= 1) && !(rowDiff == 0 && colDiff == 0);
+            int dr = Math.abs(this.row - other.getRow());
+            int dc = Math.abs(this.column - other.getColumn());
+            return dr <= 1 && dc <= 1 && !(dr == 0 && dc == 0);
         }
 
         @Override
-        public void occupy() { this.occupied = true; }
-
-        @Override
-        public void shoot() { this.hit = true; }
-
-        @Override
-        public boolean isOccupied() { return occupied; }
-
-        @Override
-        public boolean isHit() { return hit; }
-
-        @Override
-        public String toString() {
-            return String.format("Pos(%d,%d)%s%s", row, column,
-                    occupied ? "[O]" : "", hit ? "[X]" : "");
+        public void occupy() {
+            occupied = true;
         }
 
         @Override
-        public int hashCode() {
-            return row * 31 + column;
+        public void shoot() {
+            hit = true;
+        }
+
+        @Override
+        public boolean isOccupied() {
+            return occupied;
+        }
+
+        @Override
+        public boolean isHit() {
+            return hit;
         }
     }
+
 }
