@@ -390,6 +390,87 @@ class FleetTest {
 
     }
 
+    @Test
+    void testIsInsideBoard_throughAddShip() {
+
+        Fleet fleet = new Fleet();
+
+        // 1. Fully inside the board
+        MockShip inside = new MockShip("Inside", 3);
+        inside.setBoundary(0, 2, 0, 0);  // left=0, right=2, top=0, bottom=0 → valid
+        inside.setPositions(List.of(
+                new MockPosition(0, 0),
+                new MockPosition(0, 1),
+                new MockPosition(0, 2)
+        ));
+        inside.setCollisionResult(false);
+
+        assertTrue(fleet.addShip(inside), "Ship inside board should be accepted");
+
+
+        // 2. Left < 0
+        MockShip leftNeg = new MockShip("LeftNeg", 2);
+        leftNeg.setBoundary(-1, 0, 0, 0);  // left negative
+        leftNeg.setPositions(List.of(
+                new MockPosition(-1, 0),
+                new MockPosition(0, 0)
+        ));
+        leftNeg.setCollisionResult(false);
+
+        assertFalse(fleet.addShip(leftNeg), "Ship with left < 0 must be rejected");
+
+
+        // 3. Right > BOARD_SIZE - 1
+        MockShip rightBig = new MockShip("RightBig", 2);
+        rightBig.setBoundary(9, 10, 0, 0); // right beyond board (board = 0–9)
+        rightBig.setPositions(List.of(
+                new MockPosition(9, 9),
+                new MockPosition(9, 10)
+        ));
+        rightBig.setCollisionResult(false);
+
+        assertFalse(fleet.addShip(rightBig), "Ship with right > 9 must be rejected");
+
+
+        // 4. Top < 0
+        MockShip topNeg = new MockShip("TopNeg", 1);
+        topNeg.setBoundary(0, 0, -1, 0); // top < 0
+        topNeg.setPositions(List.of(
+                new MockPosition(-1, 0)
+        ));
+        topNeg.setCollisionResult(false);
+
+        assertFalse(fleet.addShip(topNeg), "Ship with top < 0 must be rejected");
+
+
+        // 5. Bottom > BOARD_SIZE - 1
+        MockShip bottomBig = new MockShip("BottomBig", 1);
+        bottomBig.setBoundary(0, 0, 0, 10); // bottom > 9
+        bottomBig.setPositions(List.of(
+                new MockPosition(10, 0)
+        ));
+        bottomBig.setCollisionResult(false);
+
+        assertFalse(fleet.addShip(bottomBig), "Ship with bottom > 9 must be rejected");
+    }
+
+    @Test
+    void testCollisionRisk_throughAddShip() {
+        Fleet fleet = new Fleet();
+
+        MockShip ship1 = new MockShip("Galeao", 3);
+        ship1.setCollisionResult(true); // ship1 considers any new ship too close
+        fleet.addShip(ship1);
+
+        MockShip ship2 = new MockShip("Fragata", 2);
+        boolean result = fleet.addShip(ship2);
+
+        assertAll(
+                () -> assertFalse(result, "Colliding ship must be rejected"),
+                () -> assertEquals(1, fleet.getShips().size(), "Fleet size must remain 1")
+        );
+    }
+
     private class MockShip implements IShip {
 
         private String category;
